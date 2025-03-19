@@ -3,6 +3,21 @@
 
 using namespace std;
 
+void ensureFilesExist(const std::string& basePath) {
+    if (!filesystem::exists(basePath + "/../code")) {
+        filesystem::create_directory(basePath + "/../code");
+    }
+
+    for (string path:vector<string>{"/../code/code.cpp", "/../code/compile_errors.txt", "/../code/output.txt"}) {
+        std::ofstream codeFile(basePath + path, std::ios::app);
+        if (!codeFile) {
+            std::cerr << "Error creating " << path << std::endl;
+        } else {
+            codeFile.close();
+        }
+    }
+}
+
 
 string getExecutablePath() {
     char result[PATH_MAX];
@@ -79,6 +94,8 @@ int readTabWidthFromEnv(string basePath) {
 
 int main(int argc, char** argv) {
     string basePath = getExecutablePath();
+    ensureFilesExist(basePath);
+
     string code, line, templateTop, templateBottom;
 
     cout << "C++ CLI (v1.0.0) - Type 'help' for a list of commands.\n";
