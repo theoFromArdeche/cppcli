@@ -19,6 +19,3 @@ set(SRCS
 
 # Executable target
 add_executable(cppcli ${SRCS})
-
-# Install target (optional)
-install(TARGETS cppcli DESTINATION bin)
