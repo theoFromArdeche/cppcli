@@ -92,33 +92,26 @@ To make the `cppcli` executable available globally, you can add it to your syste
 
 ### **Linux/macOS**
 
-1. Move the `cppcli` executable to a directory in your PATH, such as `/usr/local/bin`:
-   ```bash
-   sudo mv cppcli /usr/local/bin/
-   ```
-
-2. Alternatively, add the directory containing `cppcli` to your PATH:
+1. Add the directory containing the `cppcli` executable to your PATH:
    ```bash
    export PATH=$PATH:/path/to/cppcli
    ```
 
    To make this change permanent, add the above line to your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`).
 
-3. Verify the executable is in your PATH:
+2. Verify the executable is in your PATH:
    ```bash
    which cppcli
    ```
 
 ### **Windows**
 
-1. Move the `cppcli.exe` executable to a directory in your PATH, such as `C:\Windows\System32`.
-
-2. Alternatively, add the directory containing `cppcli.exe` to your PATH:
+1. Add the directory containing `cppcli.exe` to your PATH:
    - Open **System Properties** > **Environment Variables**.
    - Under **System Variables**, find the `Path` variable and click **Edit**.
    - Add the directory containing `cppcli.exe` to the list.
 
-3. Verify the executable is in your PATH:
+2. Verify the executable is in your PATH:
    ```cmd
    where cppcli
    ```
