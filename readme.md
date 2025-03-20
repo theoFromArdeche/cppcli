@@ -10,7 +10,7 @@ A simple command-line interface (CLI) for writing and executing C++ code interac
   - Write and execute C++ code directly in the terminal.
   - Supports multiline input for writing functions, loops, and more.
 
-- **Customizable Tab Width**:
+- **Customizable Tab size**:
   - The number of spaces inserted by the **Tab** key can be configured via a `.env` file.
 
 - **Multiline Mode**:
@@ -34,11 +34,11 @@ The program uses the `linenoise` library for line editing and command history. I
 
 ### **Key Implementation Details**
 
-1. **Tab Width**:
-   - The number of spaces inserted by the **Tab** key is configurable via the `TAB_WIDTH` variable in the `.env` file.
+1. **Tab size**:
+   - The number of spaces inserted by the **Tab** key is configurable via the `TAB_SIZE` variable in the `.env` file.
    - Example `.env` file:
      ```plaintext
-     TAB_WIDTH=4
+     TAB_SIZE=4
      ```
 
 2. **Multiline Mode**:
@@ -170,12 +170,12 @@ To make the `cppcli` executable available globally, you can add it to your syste
 
 ## **Customization**
 
-### **Tab Width**
+### **Tab size**
 
-To change the number of spaces inserted by the **Tab** key, modify the `TAB_WIDTH` variable in the `.env` file:
+To change the number of spaces inserted by the **Tab** key, modify the `TAB_SIZE` variable in the `.env` file:
 
 ```plaintext
-TAB_WIDTH=8
+TAB_SIZE=8
 ```
 
 ---

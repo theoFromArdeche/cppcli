@@ -82,8 +82,8 @@ int readTabWidthFromEnv(string basePath) {
     ifstream envFile(basePath+"/../.env");
     string line;
     while (getline(envFile, line)) {
-        if (line.find("TAB_WIDTH=") == 0) {
-            string tabWidthStr = line.substr(10);
+        if (line.find("TAB_SIZE=") == 0) {
+            string tabWidthStr = line.substr(string("TAB_SIZE=").size());
             return std::atoi(tabWidthStr.c_str());
         }
     }
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
     ifsTemplateBottom.close();
 
 
-    const int tabSize=readTabWidthFromEnv(basePath);
+    int tabSize=readTabWidthFromEnv(basePath);
     linenoiseSetTabSize(tabSize);
     linenoiseSetMultiLine(1);
 
