@@ -131,6 +131,7 @@ static struct termios orig_termios; /* In order to restore at exit.*/
 static int maskmode = 0; /* Show "***" instead of input. For passwords. */
 static int rawmode = 0; /* For atexit() function to check if restore is needed*/
 static int mlmode = 0;  /* Multi line mode. Default is single line. */
+static int tabSize = 4; /* Tab size, default is 4 */
 static int atexit_registered = 0; /* Register atexit just 1 time. */
 static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int history_len = 0;
@@ -203,6 +204,11 @@ void linenoiseMaskModeDisable(void) {
 /* Set if to use or not the multi line mode. */
 void linenoiseSetMultiLine(int ml) {
     mlmode = ml;
+}
+
+/* Set if to use or not the multi line mode. */
+void linenoiseSetTabSize(int tbsize) {
+    tabSize = tbsize;
 }
 
 /* Return true if the terminal name is in the list of terminals we know are
@@ -926,7 +932,7 @@ char *linenoiseEditMore = "If you see this, you are misusing the API: when linen
  *
  * Some other errno: I/O error.
  */
-char *linenoiseEditFeed(struct linenoiseState *l, const int TAB_WIDTH) {
+char *linenoiseEditFeed(struct linenoiseState *l) {
     /* Not a TTY, pass control to line reading without character
      * count limits. */
     if (!isatty(l->ifd)) return linenoiseNoTTY();
@@ -1075,7 +1081,7 @@ char *linenoiseEditFeed(struct linenoiseState *l, const int TAB_WIDTH) {
         if (linenoiseEditInsert(l,c)) return NULL;
         break;
     case TAB:
-        for (int i=0; i<TAB_WIDTH; i++) {
+        for (int i=0; i<tabSize; i++) {
             if (linenoiseEditInsert(l,' ')) return NULL;
         }
         break;
@@ -1120,7 +1126,7 @@ void linenoiseEditStop(struct linenoiseState *l) {
  * In many applications that are not event-drivern, we can just call
  * the blocking linenoise API, wait for the user to complete the editing
  * and return the buffer. */
-static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_t buflen, const char *prompt, const int TAB_WIDTH)
+static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_t buflen, const char *prompt)
 {
     struct linenoiseState l;
 
@@ -1132,7 +1138,7 @@ static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_
 
     linenoiseEditStart(&l,stdin_fd,stdout_fd,buf,buflen,prompt);
     char *res;
-    while((res = linenoiseEditFeed(&l, TAB_WIDTH)) == linenoiseEditMore);
+    while((res = linenoiseEditFeed(&l)) == linenoiseEditMore);
     linenoiseEditStop(&l);
     return res;
 }
@@ -1206,7 +1212,7 @@ static char *linenoiseNoTTY(void) {
  * for a blacklist of stupid terminals, and later either calls the line
  * editing function or uses dummy fgets() so that you will be able to type
  * something even in the most desperate of the conditions. */
-char *linenoise(const char *prompt, const int TAB_WIDTH) {
+char *linenoise(const char *prompt) {
     char buf[LINENOISE_MAX_LINE];
 
     if (!isatty(STDIN_FILENO)) {
@@ -1226,7 +1232,7 @@ char *linenoise(const char *prompt, const int TAB_WIDTH) {
         }
         return strdup(buf);
     } else {
-        char *retval = linenoiseBlockingEdit(STDIN_FILENO,STDOUT_FILENO,buf,LINENOISE_MAX_LINE,prompt, TAB_WIDTH);
+        char *retval = linenoiseBlockingEdit(STDIN_FILENO,STDOUT_FILENO,buf,LINENOISE_MAX_LINE,prompt);
         return retval;
     }
 }

@@ -75,13 +75,13 @@ typedef struct linenoiseCompletions {
 
 /* Non blocking API. */
 int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, char *buf, size_t buflen, const char *prompt);
-char *linenoiseEditFeed(struct linenoiseState *l, const int TAB_WIDTH);
+char *linenoiseEditFeed(struct linenoiseState *l);
 void linenoiseEditStop(struct linenoiseState *l);
 void linenoiseHide(struct linenoiseState *l);
 void linenoiseShow(struct linenoiseState *l);
 
 /* Blocking API. */
-char *linenoise(const char *prompt, const int TAB_WIDTH);
+char *linenoise(const char *prompt);
 void linenoiseFree(void *ptr);
 
 /* Completion API. */
@@ -102,6 +102,7 @@ int linenoiseHistoryLoad(const char *filename);
 /* Other utilities. */
 void linenoiseClearScreen(void);
 void linenoiseSetMultiLine(int ml);
+void linenoiseSetTabSize(int tbsize);
 void linenoisePrintKeyCodes(void);
 void linenoiseMaskModeEnable(void);
 void linenoiseMaskModeDisable(void);

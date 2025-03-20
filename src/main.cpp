@@ -113,12 +113,13 @@ int main(int argc, char** argv) {
     }
     ifsTemplateBottom.close();
 
-    const int TAB_WIDTH=readTabWidthFromEnv(basePath);
 
-
+    const int tabSize=readTabWidthFromEnv(basePath);
+    linenoiseSetTabSize(tabSize);
     linenoiseSetMultiLine(1);
+
     while (true) {
-        char* input = linenoise(">>> ", TAB_WIDTH);
+        char* input = linenoise(">>> ");
         if (!input) exit(0);
         
         line = string(input);
@@ -131,7 +132,7 @@ int main(int argc, char** argv) {
             cout << "\033[F>>> file (Ctrl+X to exit)\n";
             line="";
             while (true) {
-                char* temp = linenoise("", TAB_WIDTH);
+                char* temp = linenoise("");
                 if (!temp) break;
                 line += "\n    " + string(temp);
                 if (string(temp).back()==24) { // Ctrl-X
