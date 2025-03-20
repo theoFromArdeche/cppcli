@@ -206,7 +206,7 @@ void linenoiseSetMultiLine(int ml) {
     mlmode = ml;
 }
 
-/* Set if to use or not the multi line mode. */
+/* To change the tab size (Default is 4) */
 void linenoiseSetTabSize(int tbsize) {
     tabSize = tbsize;
 }
