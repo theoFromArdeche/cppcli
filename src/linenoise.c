@@ -132,6 +132,7 @@ static int maskmode = 0; /* Show "***" instead of input. For passwords. */
 static int rawmode = 0; /* For atexit() function to check if restore is needed*/
 static int mlmode = 0;  /* Multi line mode. Default is single line. */
 static int tabSize = 4; /* Tab size, default is 4 */
+static char *noNewlineText = NULL; /* A way to avoid newline when typing a specific line, default never triggers */
 static int atexit_registered = 0; /* Register atexit just 1 time. */
 static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int history_len = 0;
@@ -145,7 +146,8 @@ enum KEY_ACTION{
 	CTRL_D = 4,         /* Ctrl-d */
 	CTRL_E = 5,         /* Ctrl-e */
 	CTRL_F = 6,         /* Ctrl-f */
-	CTRL_H = 8,         /* Ctrl-h */
+    CTRL_G = 7,         /* Ctrl-g */
+	CTRL_I = 9,         /* Ctrl-i */
 	TAB = 9,            /* Tab */
 	CTRL_K = 11,        /* Ctrl+k */
 	CTRL_L = 12,        /* Ctrl+l */
@@ -209,6 +211,11 @@ void linenoiseSetMultiLine(int ml) {
 /* To change the tab size (Default is 4) */
 void linenoiseSetTabSize(int tbsize) {
     tabSize = tbsize;
+}
+
+/* To change the text that avoids newlines (Default is NULL) */
+void linenoiseSetNoNewlineText(const char *text) {
+    noNewlineText = strdup(text);
 }
 
 /* Return true if the terminal name is in the list of terminals we know are
@@ -1016,6 +1023,9 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
     case CTRL_F:     /* ctrl-f */
         linenoiseEditMoveRight(l);
         break;
+    case CTRL_G:     /* ctrl-g : test key */
+        
+        break;
     case CTRL_P:    /* ctrl-p */
         linenoiseEditHistoryNext(l, LINENOISE_HISTORY_PREV);
         break;
@@ -1139,7 +1149,8 @@ static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_
     linenoiseEditStart(&l,stdin_fd,stdout_fd,buf,buflen,prompt);
     char *res;
     while((res = linenoiseEditFeed(&l)) == linenoiseEditMore);
-    linenoiseEditStop(&l);
+    if (res == NULL || noNewlineText == NULL || strcmp(res, noNewlineText)) linenoiseEditStop(&l);
+    else if (isatty(l.ifd)) disableRawMode(l.ifd);
     return res;
 }
 
@@ -1213,6 +1224,7 @@ static char *linenoiseNoTTY(void) {
  * editing function or uses dummy fgets() so that you will be able to type
  * something even in the most desperate of the conditions. */
 char *linenoise(const char *prompt) {
+
     char buf[LINENOISE_MAX_LINE];
 
     if (!isatty(STDIN_FILENO)) {
@@ -1262,9 +1274,17 @@ static void freeHistory(void) {
 
 /* At exit we'll try to fix the terminal to the initial conditions. */
 static void linenoiseAtExit(void) {
-    disableRawMode(STDIN_FILENO);
-    freeHistory();
+    if (atexit_registered) {
+        disableRawMode(STDIN_FILENO);
+        freeHistory();
+        atexit_registered=0;
+    }
+    if (noNewlineText) {
+        free(noNewlineText);
+        noNewlineText = NULL;
+    }
 }
+
 
 /* This is the API call to add a new entry in the linenoise history.
  * It uses a fixed array of char pointers that are shifted (memmoved)
