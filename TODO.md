@@ -40,3 +40,7 @@ TODO : send a signal after arrow up/down to tell the cpp (char at the end of the
 TODO : do the cpp part of the new file mode 
     receive arrows up and down and modify the right line
     (maybe use two stack, stack_before and stack_after)
+
+TODO : when pressing enter, split the cur line to create the new line with the right part
+
+TODO : add some IDE things like generating the closing char for "" () [] {} 
