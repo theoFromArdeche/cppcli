@@ -65,7 +65,6 @@ struct linenoiseState {
     size_t len;         /* Current edited line length. */
     size_t cols;        /* Number of columns in terminal. */
     size_t oldrows;     /* Rows used by last refrehsed line (multiline mode) */
-    int history_index;  /* The history index we are currently editing. */
 };
 
 typedef struct linenoiseCompletions {
@@ -98,11 +97,13 @@ int linenoiseHistoryAdd(const char *line);
 int linenoiseHistorySetMaxLen(int len);
 int linenoiseHistorySave(const char *filename);
 int linenoiseHistoryLoad(const char *filename);
+void linenoiseResetFileHistory(void);
 
 /* Other utilities. */
 void linenoiseClearScreen(void);
 void linenoiseSetMultiLine(int ml);
 void linenoiseSetTabSize(int tbsize);
+void linenoiseSetMode(int mode);
 void linenoiseSetNoNewlineText(const char *text);
 void linenoisePrintKeyCodes(void);
 void linenoiseMaskModeEnable(void);

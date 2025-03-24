@@ -141,6 +141,8 @@ int main(int argc, char** argv) {
             cout << "\033[F>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")\n";
             line = "";
             int historyCount = 1;
+            linenoiseSetMode(1);
+            linenoiseSetMultiLine(0);
 
             while (true) {
                 char* temp = linenoise("");
@@ -165,9 +167,14 @@ int main(int argc, char** argv) {
                 }
             }
             cout << ">>> End of file\n";
+            cout << "|||" << line << "|||\n"; 
 
             if (contextMode) code += "\n    " + line;
             else code = line;
+            
+            linenoiseResetFileHistory();
+            linenoiseSetMode(0);
+            linenoiseSetMultiLine(1);
 
         } else if (line == "clear") {
             cout << "\033[2J\033[H" << flush;
