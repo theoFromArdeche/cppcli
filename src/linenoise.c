@@ -861,8 +861,8 @@ void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
 
     if (file_mode) {
         prevPos=l->pos;
-        if (dir == LINENOISE_HISTORY_PREV) write(l->ofd, "\033[Aaa", 5);
-        else write(l->ofd, "\033[Bbb", 5);
+        if (dir == LINENOISE_HISTORY_PREV) write(l->ofd, "\033[A", 3);
+        else write(l->ofd, "\033[B", 3);
         return;
     }
 
@@ -895,19 +895,37 @@ void linenoisePrintHistory(int startIndex, struct linenoiseState *l) {
 
 void linenoiseNewLine(struct linenoiseState *l) {
     if (file_mode) {
-        linenoiseHistoryAdd("");
         prevPos = 0;
+        linenoiseHistoryAdd("");
+        int start = history_len-1-history_index;
+        free(history[history_len-1]);
+        memmove(history+start+1,history+start,sizeof(char*)*history_index);
+
+        char prevLine[LINENOISE_MAX_LINE], newLine[LINENOISE_MAX_LINE];
+        memcpy(prevLine, l->buf, l->pos);
+        prevLine[l->pos] = '\0';
+
+        size_t remaining = l->len - l->pos;
+        memcpy(newLine, l->buf + l->pos, remaining);
+        newLine[remaining] = '\0';
+
+        
+        if (start-1 >= 0) {
+            history[start-1] = strdup(prevLine);
+            char temp[LINENOISE_MAX_LINE];
+            sprintf(temp, "\r\033[K%s", history[start-1]);
+            write(l->ofd, temp, strlen(temp));
+        }
+        history[start] = strdup(newLine);
+
+
         if (history_index==0) {
             write(l->ofd, "\n\r", 2);
             return;
         }
-        free(history[history_len-1]);
-        int start = history_len-1-history_index;
-        memmove(history+start+1,history+start,sizeof(char*)*history_index);
-        history[start] = strdup("\0");
+
         write(l->ofd, "\033[E\033[K", 6);
         linenoisePrintHistory(start+1, l);
-
         char temp[LINENOISE_MAX_LINE];
         sprintf(temp, "\033[%dF", history_index);
         write(l->ofd, temp, strlen(temp));
