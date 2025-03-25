@@ -59,7 +59,7 @@ int runCode(const string& basePath) {
         if (!hasOutput) hasOutput = 1;
     }
 
-    return hasOutput;
+    return hasOutput ? 2 : 0;
 }
 
 void showHelp() {
@@ -126,6 +126,7 @@ int main(int argc, char** argv) {
 
 
     bool contextMode = true;  // Default to Context Mode
+    bool fileMode = false;
     while (true) {
         char* input = linenoise(">>> ");
         if (!input) exit(0);
@@ -138,9 +139,8 @@ int main(int argc, char** argv) {
 
         string previousCode = code;
         if (line == "file") {
+            fileMode = true;
             cout << "\033[F>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")\n";
-            line = "";
-            int historyCount = 1;
             linenoiseSetMode(1);
             linenoiseSetMultiLine(0);
 
@@ -151,23 +151,35 @@ int main(int argc, char** argv) {
                 string tempStr(temp);
                 free(temp);
 
-                if (tempStr == "toggle") {
+                if (tempStr.back() == '\x14') { // Ctrl+T
                     contextMode = !contextMode;
-                    cout << "\033[" << historyCount << "F\033[K>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")\n";
-                    cout << "\033[" << historyCount - 1 << "E\033[K" << flush;
+                    int history_len=0, history_file_len=0, history_index=0;
+                    linenoiseGetHistorySizes(&history_len, &history_file_len, &history_index);
+
+                    cout << "\033[" << history_file_len - history_index << "F\033[K>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")";
+                    cout << "\033[" << history_file_len - history_index << "E\033[K" << flush;
                     continue;
                 }
 
-                line += "\n    " + tempStr;
-                historyCount++;
-
                 if (tempStr.back() == '\x18') {  // Ctrl+X
-                    line.pop_back();
                     break;
                 }
+
             }
+
+            int history_len=0, history_file_len=0, history_index=0;
+            linenoiseGetHistorySizes(&history_len, &history_file_len, &history_index);
+            char** historyFile = linenoiseGetHistory();
+
+            cout << "\033[" << history_index << "E\n";
             cout << ">>> End of file\n";
-            cout << "|||" << line << "|||\n"; 
+
+            line = "";
+            for (int i=history_file_len-1; i>=0; i--) {
+                line += "\n    " + string(historyFile[history_len-1-i]);
+            }
+
+            //cout << "\n|||\n" << line << "\n|||\n";
 
             if (contextMode) code += "\n    " + line;
             else code = line;
@@ -201,7 +213,14 @@ int main(int argc, char** argv) {
         codeFileStream.close();
 
         int result = runCode(basePath);
-        if (result || !contextMode) code = previousCode;
+        if (result==1 || (!fileMode && result == 2) || (fileMode && !contextMode)) {
+            // did not compile
+            // or in script mode and there is an output
+            // or in file temporary mode
+            code = previousCode;
+        }
+
+        if (fileMode) fileMode=false;
         
     }
 

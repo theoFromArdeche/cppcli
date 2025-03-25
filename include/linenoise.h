@@ -98,6 +98,8 @@ int linenoiseHistorySetMaxLen(int len);
 int linenoiseHistorySave(const char *filename);
 int linenoiseHistoryLoad(const char *filename);
 void linenoiseResetFileHistory(void);
+char** linenoiseGetHistory(void);
+void linenoiseGetHistorySizes(int *h_len, int *h_file_len, int *h_index);
 
 /* Other utilities. */
 void linenoiseClearScreen(void);

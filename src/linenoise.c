@@ -238,6 +238,16 @@ void linenoiseResetFileHistory(void) {
 }
 
 
+char** linenoiseGetHistory(void) {
+    return history;
+}
+
+void linenoiseGetHistorySizes(int *h_len, int *h_file_len, int *h_index) {
+    *h_len = history_len;
+    *h_file_len = history_file_len; 
+    *h_index = history_index;
+}
+
 
 /* To change the text that avoids newlines (Default is NULL) */
 void linenoiseSetNoNewlineText(const char *text) {
@@ -795,7 +805,9 @@ int linenoiseEditInsert(struct linenoiseState *l, char c) {
             refreshLine(l);
         }
     }
-    prevPos=l->pos;
+    if (c != CTRL_X && c != CTRL_T) {
+        prevPos=l->pos;
+    }
     return 0;
 }
 
@@ -1109,8 +1121,10 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
         }
         return strdup(l->buf);
     case CTRL_X:
-        if (linenoiseEditInsert(l,CTRL_X)) return NULL;
+        flagNoNewLine=1;
         linenoiseEditHistoryPopBuffer(l);
+        l->pos=l->len;
+        if (linenoiseEditInsert(l,CTRL_X)) return NULL;
         if (mlmode) linenoiseEditMoveEnd(l);
         if (hintsCallback) {
             /* Force a refresh without hints to leave the previous
@@ -1138,8 +1152,17 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
             return NULL;
         }
         break;
-    case CTRL_T:    /* ctrl-t, swaps current character with previous. */
-        if (l->pos > 0 && l->pos < l->len) {
+    case CTRL_T:   
+        if (file_mode) {
+             // toogle context/temp mode
+            linenoiseEditHistoryPopBuffer(l);
+            l->pos=l->len;
+            if (linenoiseEditInsert(l,CTRL_T)) return NULL;
+            flagNoNewLine=1;
+            return strdup(l->buf);
+        }
+
+        if (l->pos > 0 && l->pos < l->len) { /* ctrl-t, swaps current character with previous. */
             int aux = l->buf[l->pos-1];
             l->buf[l->pos-1] = l->buf[l->pos];
             l->buf[l->pos] = aux;
