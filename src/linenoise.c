@@ -795,6 +795,7 @@ int linenoiseEditInsert(struct linenoiseState *l, char c) {
             refreshLine(l);
         }
     }
+    prevPos=l->pos;
     return 0;
 }
 
@@ -804,6 +805,7 @@ void linenoiseEditMoveLeft(struct linenoiseState *l) {
         l->pos--;
         refreshLine(l);
     }
+    prevPos=l->pos;
 }
 
 /* Move cursor on the right. */
@@ -812,6 +814,7 @@ void linenoiseEditMoveRight(struct linenoiseState *l) {
         l->pos++;
         refreshLine(l);
     }
+    prevPos=l->pos;
 }
 
 /* Move cursor to the start of the line. */
@@ -820,6 +823,7 @@ void linenoiseEditMoveHome(struct linenoiseState *l) {
         l->pos = 0;
         refreshLine(l);
     }
+    prevPos=l->pos;
 }
 
 /* Move cursor to the end of the line. */
@@ -828,6 +832,7 @@ void linenoiseEditMoveEnd(struct linenoiseState *l) {
         l->pos = l->len;
         refreshLine(l);
     }
+    prevPos=l->pos;
 }
 
 /* Substitute the currently edited line with the next or previous history
@@ -848,7 +853,6 @@ void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
 
     if (file_mode && dir == LINENOISE_HISTORY_PREV && history_index == history_file_len) {
         history_index = history_file_len-1;
-        prevPos=l->pos;
         return;
     } else if (history_index < 0) {
         history_index = 0;
@@ -860,7 +864,6 @@ void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
 
 
     if (file_mode) {
-        prevPos=l->pos;
         if (dir == LINENOISE_HISTORY_PREV) write(l->ofd, "\033[A", 3);
         else write(l->ofd, "\033[B", 3);
         return;
@@ -954,6 +957,7 @@ void linenoiseEditBackspace(struct linenoiseState *l) {
         l->buf[l->len] = '\0';
         refreshLine(l);
     }
+    prevPos=l->pos;
 }
 
 /* Delete the previosu word, maintaining the cursor at the start of the

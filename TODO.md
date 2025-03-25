@@ -3,10 +3,6 @@
 - file : being able to navigate the file and make changes
 
 
-TODO : the cursor should be working the same as in .txt for example when going up or down (not always same pos but its the same if possible)
-
-
-
 TODO : send a signal after arrow up/down to tell the cpp (char at the end of the line, like ctrl-d works)
 
 TODO : do the cpp part of the new file mode 
