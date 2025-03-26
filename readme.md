@@ -4,29 +4,45 @@ A simple command-line interface (CLI) for writing and executing C++ code interac
 
 ---
 
+
 ## **Features**
 
-- **Interactive C++ Code Execution**:
-  - Write and execute C++ code directly in the terminal.
-  - Supports multiline input for writing functions, loops, and more.
+### **Execution Modes**
+- **Script Mode (Default)**
+  - Immediate line-by-line execution
+  - Output displays once (like Python REPL)
+  - Non-output lines persist for future execution
+  - Ideal for quick tests and variable setup
 
-- **Customizable Tab size**:
-  - The number of spaces inserted by the **Tab** key can be configured via a `.env` file.
+- **File Mode**
+  - Full multi-line editing (enter with `file` command)
+  - Two run modes (toggle with Ctrl+T):
+    - **Context Mode**: Shares variables with Script Mode
+    - **Temporary Mode**: Completely isolated execution
+  - All lines persist in file buffer
+  - Perfect for complex code and output
 
-- **Multiline Mode**:
-  - Enter multiline mode by typing the `file` command.
-  - Exit multiline mode by pressing **Ctrl+X**.
-
-- **Command History**:
-  - Use the **Up** and **Down** arrow keys to navigate through previously entered commands.
-
-- **Clear Screen**:
-  - Use the `clear` command to clear the terminal screen.
-
-- **Reset Code Buffer**:
-  - Use the `reset` command to clear all previously entered code.
+### **Core Features**
+- **Smart Output Handling**: Automatic output management
+- **Customizable Tab Size**: Configure via `.env` file
+- **Command History**: Arrow keys navigation
+- **Session Management**:
+  - `reset script`: Clear script buffer
+  - `reset file`: Clear file buffer
+  - `clear`: Clean terminal
 
 ---
+
+## **Key Behaviors**
+| Feature          | Script Mode               | File Mode                 |
+|------------------|---------------------------|---------------------------|
+| Output           | Shows once                | Shows every execution     |
+| Persistence      | Only non-output lines     | All lines saved           |
+| Variable Scope   | Persistent                | Configurable (see modes)  |
+| Best For         | Quick tests, variables    | Complex logic, output     |
+
+---
+
 
 ## **How It Works**
 
@@ -178,3 +194,4 @@ TAB_SIZE=8
 ## **Contributing**
 
 Contributions are welcome! Please open an issue or submit a pull request.
+

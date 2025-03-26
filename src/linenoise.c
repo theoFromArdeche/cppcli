@@ -126,24 +126,29 @@ static linenoiseFreeHintsCallback *freeHintsCallback = NULL;
 static char *linenoiseNoTTY(void);
 static void refreshLineWithCompletion(struct linenoiseState *ls, linenoiseCompletions *lc, int flags);
 static void refreshLineWithFlags(struct linenoiseState *l, int flags);
+void linenoisePrintHistory(int startIndex);
 
 static struct termios orig_termios; /* In order to restore at exit.*/
 static int maskmode = 0; /* Show "***" instead of input. For passwords. */
 static int rawmode = 0; /* For atexit() function to check if restore is needed*/
 static int mlmode = 0;  /* Multi line mode. Default is single line. */
 static int tab_size = 4; /* Tab size, default is 4 */
-static char *noNewlineText = NULL; /* A way to avoid newline when typing a specific line, default never triggers */
+static char *no_newline_text = NULL; /* A way to avoid newline when typing a specific line, default never triggers */
 static int atexit_registered = 0; /* Register atexit just 1 time. */
-static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
-static int history_len = 0;
-static int history_index = 0;  /* The history index we are currently editing. */
 static size_t prevPos = 0;         /* previous cursor position (used in file mode) */
+static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
+static int history_script_len = 0;
+static int history_script_index = 0;  /* The history index we are currently editing. */
 static int history_file_len = 0; 
-/* when in file mode, the history of the file is at the end of the history variable
- and is seperated fromthe previous history */
+static int history_file_index = 0;
 static int file_mode = 0; // default is false
-static int flagNoNewLine = 0; // to avoid new lines
-static char **history = NULL;
+static int flag_no_newline = 0; // to avoid new lines
+static char **history_file = NULL, **history_script = NULL;
+static char **history = NULL; 
+static int *history_len = &history_script_len;
+static int *history_index = &history_script_index;
+static int l_ofd = STDOUT_FILENO;
+
 
 enum KEY_ACTION{
 	KEY_NULL = 0,	    /* NULL */
@@ -223,35 +228,52 @@ void linenoiseSetTabSize(int tbsize) {
 /* To change the mode (0 is script, 1 is file) */
 void linenoiseSetMode(int mode) {
     file_mode = mode;
-}
+    if (file_mode) {
+        history = history_file;
+        history_index = &history_file_index;
+        history_len = &history_file_len;
 
+        if (history_file_len == 0) return;
+        
+        write(l_ofd, "\033[F", 3);
+        linenoisePrintHistory(0);
+        if ((*history_index) == 0) return;
 
-/* To reset the file part in the history (if file mode is enabled) */
-void linenoiseResetFileHistory(void) {
-    if (file_mode == 0) return;
-    for (int i=0; i<history_file_len; i++) {
-        history_len--;
-        free(history[history_len]);
+        char temp[LINENOISE_MAX_LINE];
+        sprintf(temp, "\033[%dF", (*history_index));
+        write(l_ofd, temp, strlen(temp));
+
+    } else {
+        history = history_script;
+        history_index = &history_script_index;
+        history_len = &history_script_len;
     }
-    history_file_len=0;
-    history_index = history_index < history_len-1 ? history_index : history_len-1;
 }
 
 
-char** linenoiseGetHistory(void) {
-    return history;
+/* To reset the file history */
+void linenoiseResetFileHistory(void) {
+    for (int i=0; i<history_file_len; i++) {
+        free(history_file[i]);
+    }
+    history_file_len = 0;
+    history_file_index = 0;
 }
 
-void linenoiseGetHistorySizes(int *h_len, int *h_file_len, int *h_index) {
-    *h_len = history_len;
+
+char** linenoiseGetHistoryFile(void) {
+    return history_file;
+}
+
+void linenoiseGetFileHistorySizes(int *h_file_len, int *h_file_index) {
     *h_file_len = history_file_len; 
-    *h_index = history_index;
+    *h_file_index = history_file_index;
 }
 
 
 /* To change the text that avoids newlines (Default is NULL) */
 void linenoiseSetNoNewlineText(const char *text) {
-    noNewlineText = strdup(text);
+    no_newline_text = strdup(text);
 }
 
 /* Return true if the terminal name is in the list of terminals we know are
@@ -271,7 +293,15 @@ static int enableRawMode(int fd) {
     struct termios raw;
 
     if (!isatty(STDIN_FILENO)) goto fatal;
-    if (!atexit_registered) {
+    if (!atexit_registered) { // only triggers once
+        history_file = malloc(sizeof(char*)*history_max_len);
+        memset(history_file,0,(sizeof(char*)*history_max_len));
+
+        history_script = malloc(sizeof(char*)*history_max_len);
+        memset(history_script,0,(sizeof(char*)*history_max_len));
+
+        history = history_script;
+
         atexit(linenoiseAtExit);
         atexit_registered = 1;
     }
@@ -805,7 +835,7 @@ int linenoiseEditInsert(struct linenoiseState *l, char c) {
             refreshLine(l);
         }
     }
-    if (c != CTRL_X && c != CTRL_T) {
+    if (file_mode && c != CTRL_X && c != CTRL_T) {
         prevPos=l->pos;
     }
     return 0;
@@ -817,7 +847,7 @@ void linenoiseEditMoveLeft(struct linenoiseState *l) {
         l->pos--;
         refreshLine(l);
     }
-    prevPos=l->pos;
+    if (file_mode) prevPos=l->pos;
 }
 
 /* Move cursor on the right. */
@@ -826,7 +856,7 @@ void linenoiseEditMoveRight(struct linenoiseState *l) {
         l->pos++;
         refreshLine(l);
     }
-    prevPos=l->pos;
+    if (file_mode) prevPos=l->pos;
 }
 
 /* Move cursor to the start of the line. */
@@ -835,7 +865,7 @@ void linenoiseEditMoveHome(struct linenoiseState *l) {
         l->pos = 0;
         refreshLine(l);
     }
-    prevPos=l->pos;
+    if (file_mode) prevPos=l->pos;
 }
 
 /* Move cursor to the end of the line. */
@@ -844,7 +874,7 @@ void linenoiseEditMoveEnd(struct linenoiseState *l) {
         l->pos = l->len;
         refreshLine(l);
     }
-    prevPos=l->pos;
+    if (file_mode) prevPos=l->pos;
 }
 
 /* Substitute the currently edited line with the next or previous history
@@ -852,25 +882,23 @@ void linenoiseEditMoveEnd(struct linenoiseState *l) {
 #define LINENOISE_HISTORY_NEXT 0
 #define LINENOISE_HISTORY_PREV 1
 void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
-    if (history_len <= 1) return;
-    if (file_mode) flagNoNewLine=1;
+    if ((*history_len) <= 1) return;
+    if (file_mode) flag_no_newline=1;
 
         
     /* Update the current history entry before to
         * overwrite it with the next one. */
-    free(history[history_len - 1 - history_index]);
-    history[history_len - 1 - history_index] = strdup(l->buf);
-    /* Show the new entry */
-    history_index += (dir == LINENOISE_HISTORY_PREV) ? 1 : -1;
+    free(history[(*history_len) - 1 - (*history_index)]);
+    history[(*history_len) - 1 - (*history_index)] = strdup(l->buf);
 
-    if (file_mode && dir == LINENOISE_HISTORY_PREV && history_index == history_file_len) {
-        history_index = history_file_len-1;
+    /* Show the new entry */
+    (*history_index) += (dir == LINENOISE_HISTORY_PREV) ? 1 : -1;
+
+    if ((*history_index) < 0) {
+        (*history_index) = 0;
         return;
-    } else if (history_index < 0) {
-        history_index = 0;
-        return;
-    } else if (history_index >= history_len) {
-        history_index = history_len-1;
+    } else if ((*history_index) >= (*history_len)) {
+        (*history_index) = (*history_len)-1;
         return;
     }
 
@@ -881,7 +909,7 @@ void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
         return;
     }
 
-    strncpy(l->buf,history[history_len - 1 - history_index],l->buflen);
+    strncpy(l->buf,history[(*history_len) - 1 - (*history_index)],l->buflen);
     l->buf[l->buflen-1] = '\0';
     // l->len = l->pos = strlen(l->buf);
     l->len = strlen(l->buf);
@@ -892,18 +920,18 @@ void linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
 /* Pops the last element of the history which is the buffer when not in file mode */
 void linenoiseEditHistoryPopBuffer(struct linenoiseState *l) {
     if (file_mode) {
-        free(history[history_len-1-history_index]);
-        history[history_len-1-history_index] = strdup(l->buf);
+        free(history[(*history_len)-1-(*history_index)]);
+        history[(*history_len)-1-(*history_index)] = strdup(l->buf);
     }
-    else history_len--;
+    else (*history_len)--;
 }
 
 
-void linenoisePrintHistory(int startIndex, struct linenoiseState *l) {
-    for (int i=startIndex; i<history_len; i++) {
+void linenoisePrintHistory(int startIndex) {
+    for (int i=startIndex; i<(*history_len); i++) {
         char temp[LINENOISE_MAX_LINE];
         sprintf(temp, "\n\r\033[K%s", history[i]);
-        write(l->ofd, temp, strlen(temp));
+        write(l_ofd, temp, strlen(temp));
     }
 }
 
@@ -912,9 +940,9 @@ void linenoiseNewLine(struct linenoiseState *l) {
     if (file_mode) {
         prevPos = 0;
         linenoiseHistoryAdd("");
-        int start = history_len-1-history_index;
-        free(history[history_len-1]);
-        memmove(history+start+1,history+start,sizeof(char*)*history_index);
+        int start = (*history_len)-1-(*history_index);
+        free(history[(*history_len)-1]);
+        memmove(history+start+1,history+start,sizeof(char*)*(*history_index));
 
         char prevLine[LINENOISE_MAX_LINE], newLine[LINENOISE_MAX_LINE];
         memcpy(prevLine, l->buf, l->pos);
@@ -934,15 +962,15 @@ void linenoiseNewLine(struct linenoiseState *l) {
         history[start] = strdup(newLine);
 
 
-        if (history_index==0) {
+        if ((*history_index)==0) {
             write(l->ofd, "\n\r", 2);
             return;
         }
 
         write(l->ofd, "\033[E\033[K", 6);
-        linenoisePrintHistory(start+1, l);
+        linenoisePrintHistory(start+1);
         char temp[LINENOISE_MAX_LINE];
-        sprintf(temp, "\033[%dF", history_index);
+        sprintf(temp, "\033[%dF", (*history_index));
         write(l->ofd, temp, strlen(temp));
     } else {
         write(l->ofd, "\n\r", 2);
@@ -969,7 +997,7 @@ void linenoiseEditBackspace(struct linenoiseState *l) {
         l->buf[l->len] = '\0';
         refreshLine(l);
     }
-    prevPos=l->pos;
+    if (file_mode) prevPos=l->pos;
 }
 
 /* Delete the previosu word, maintaining the cursor at the start of the
@@ -1018,6 +1046,7 @@ int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, ch
     l->in_completion = 0;
     l->ifd = stdin_fd != -1 ? stdin_fd : STDIN_FILENO;
     l->ofd = stdout_fd != -1 ? stdout_fd : STDOUT_FILENO;
+    l_ofd = l->ofd;
     l->buf = buf;
     l->buflen = buflen;
     l->prompt = prompt;
@@ -1025,9 +1054,12 @@ int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, ch
     l->oldpos = 0;
     l->len = 0;
 
+    /* Enter raw mode. */
+    if (enableRawMode(l->ifd) == -1) return -1;
+
 
     if (file_mode && history_file_len != 0) {
-        strncpy(l->buf,history[history_len - 1 - history_index],l->buflen);
+        strncpy(l->buf,history[(*history_len) - 1 - (*history_index)],l->buflen);
         l->buf[l->buflen-1] = '\0';
         l->len = strlen(l->buf);
         l->pos = prevPos < l->len ? prevPos : l->len;
@@ -1040,15 +1072,13 @@ int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, ch
         /* Buffer starts empty. */
         l->buf[0] = '\0';
         l->buflen--; /* Make sure there is always space for the nulterm */
-        history_index = 0;
+        (*history_index) = 0;
 
          /* The latest history entry is always our current buffer, that
         * initially is just an empty string. */
         linenoiseHistoryAdd("");
     }
 
-    /* Enter raw mode. */
-    if (enableRawMode(l->ifd) == -1) return -1;
 
     l->cols = getColumns(stdin_fd, stdout_fd);
     l->oldrows = 0;
@@ -1121,7 +1151,7 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
         }
         return strdup(l->buf);
     case CTRL_X:
-        flagNoNewLine=1;
+        flag_no_newline=1;
         linenoiseEditHistoryPopBuffer(l);
         l->pos=l->len;
         if (linenoiseEditInsert(l,CTRL_X)) return NULL;
@@ -1158,7 +1188,7 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
             linenoiseEditHistoryPopBuffer(l);
             l->pos=l->len;
             if (linenoiseEditInsert(l,CTRL_T)) return NULL;
-            flagNoNewLine=1;
+            flag_no_newline=1;
             return strdup(l->buf);
         }
 
@@ -1306,12 +1336,12 @@ static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_
     linenoiseEditStart(&l,stdin_fd,stdout_fd,buf,buflen,prompt);
     char *res;
     while((res = linenoiseEditFeed(&l)) == linenoiseEditMore);
-    if ((res == NULL || noNewlineText == NULL || strcmp(res, noNewlineText)) && flagNoNewLine==0) linenoiseEditStop(&l);
+    if ((res == NULL || no_newline_text == NULL || strcmp(res, no_newline_text)) && flag_no_newline==0) linenoiseEditStop(&l);
     else if (isatty(l.ifd)) disableRawMode(l.ifd);
-    if (flagNoNewLine) flagNoNewLine=0;
-    // printf("\n\r|%d|%d|%d|%d|\n", history_len, history_index, history_file_len, file_mode);
+    if (flag_no_newline) flag_no_newline=0;
+    // printf("\n\r|%d|%d|%d|%d|\n", (*history_len), (*history_index), history_file_len, file_mode);
     // for (int i=0; i<history_file_len; i++) {
-    //     printf("\r%s\n", history[history_len-i-1]);
+    //     printf("\r%s\n", history[(*history_len)-i-1]);
     // }
     return res;
 }
@@ -1428,7 +1458,7 @@ static void freeHistory(void) {
     if (history) {
         int j;
 
-        for (j = 0; j < history_len; j++)
+        for (j = 0; j < (*history_len); j++)
             free(history[j]);
         free(history);
     }
@@ -1441,9 +1471,9 @@ static void linenoiseAtExit(void) {
         freeHistory();
         atexit_registered=0;
     }
-    if (noNewlineText) {
-        free(noNewlineText);
-        noNewlineText = NULL;
+    if (no_newline_text) {
+        free(no_newline_text);
+        no_newline_text = NULL;
     }
 }
 
@@ -1461,27 +1491,22 @@ int linenoiseHistoryAdd(const char *line) {
     if (history_max_len == 0) return 0;
 
     /* Initialization on first call. */
-    if (history == NULL) {
-        history = malloc(sizeof(char*)*history_max_len);
-        if (history == NULL) return 0;
-        memset(history,0,(sizeof(char*)*history_max_len));
-    }
 
     /* Don't add duplicated lines. */
-    if (history_len && !strcmp(history[history_len-1], line) && file_mode == 0) return 0;
+    if ((*history_len) && !strcmp(history[(*history_len)-1], line) && file_mode == 0) return 0;
 
     /* Add an heap allocated copy of the line in the history.
      * If we reached the max length, remove the older line. */
     linecopy = strdup(line);
     if (!linecopy && file_mode == 0) return 0;
-    if (history_len == history_max_len) {
+    if ((*history_len) == history_max_len) {
         free(history[0]);
         memmove(history,history+1,sizeof(char*)*(history_max_len-1));
-        history_len--;
+        (*history_len)--;
     }
-    history[history_len] = linecopy;
-    history_len++;
-    if (file_mode) history_file_len++;
+    history[(*history_len)] = linecopy;
+    (*history_len)++;
+
     return 1;
 }
 
@@ -1489,12 +1514,12 @@ int linenoiseHistoryAdd(const char *line) {
  * if there is already some history, the function will make sure to retain
  * just the latest 'len' elements if the new history length value is smaller
  * than the amount of items already inside the history. */
-int linenoiseHistorySetMaxLen(int len) {
+int linenoiseHistorySetMaxLen(int len) { // when used, should be called on history_script and history_file
     char **new;
 
     if (len < 1) return 0;
     if (history) {
-        int tocopy = history_len;
+        int tocopy = (*history_len);
 
         new = malloc(sizeof(char*)*len);
         if (new == NULL) return 0;
@@ -1507,13 +1532,13 @@ int linenoiseHistorySetMaxLen(int len) {
             tocopy = len;
         }
         memset(new,0,sizeof(char*)*len);
-        memcpy(new,history+(history_len-tocopy), sizeof(char*)*tocopy);
+        memcpy(new,history+((*history_len)-tocopy), sizeof(char*)*tocopy);
         free(history);
         history = new;
     }
     history_max_len = len;
-    if (history_len > history_max_len)
-        history_len = history_max_len;
+    if ((*history_len) > history_max_len)
+        (*history_len) = history_max_len;
     return 1;
 }
 
@@ -1528,7 +1553,7 @@ int linenoiseHistorySave(const char *filename) {
     umask(old_umask);
     if (fp == NULL) return -1;
     chmod(filename,S_IRUSR|S_IWUSR);
-    for (j = 0; j < history_len; j++)
+    for (j = 0; j < (*history_len); j++)
         fprintf(fp,"%s\n",history[j]);
     fclose(fp);
     return 0;

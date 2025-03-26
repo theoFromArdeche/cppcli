@@ -28,9 +28,11 @@ string getExecutablePath() {
 }
 
 // Compile and run the code
-int runCode(const string& basePath) {
+int runCode(const string& basePath, bool flagCompile=true) {
     string compileCommand = "g++ " + basePath + "/../code/code.cpp -o " + basePath + "/../code/code 2> " + basePath + "/../code/compile_errors.txt";
-    int compileStatus = system(compileCommand.c_str());
+    
+    int compileStatus = 0;
+    if (flagCompile) compileStatus = system(compileCommand.c_str());
 
     if (compileStatus != 0) {
         ifstream errorFile(basePath + "/../code/compile_errors.txt");
@@ -63,20 +65,41 @@ int runCode(const string& basePath) {
 }
 
 void showHelp() {
-    cout << "\nWelcome to the C++ CLI!\n\n";
-    cout << "This program allows you to write and execute C++ code interactively.\n";
-    cout << "Available commands:\n";
-    cout << "  - file: Enter multiline code. Type 'file' and press Enter, then start writing your code.\n";
-    cout << "          Press Ctrl+X to exit and execute the code.\n";
-    cout << "  - clear: Clear the terminal screen.\n";
-    cout << "  - reset: Reset the code buffer (clear all previously entered code).\n";
-    cout << "  - toggle: In multiline mode, toggle between Context Mode and Temporary Mode.\n";
-    cout << "      - Context Mode: New code is appended to the existing code.\n";
-    cout << "      - Temporary Mode: New code is executed without affecting the existing context.\n";
-    cout << "            Note: Changes made in Temporary Mode are not saved after execution.\n";
-    cout << "  - help: Show this help message.\n";
-    cout << "  - exit: Exit the program.\n";
-    cout << "You can also type C++ code directly at the prompt and press Enter to execute it.\n\n";
+    cout << "\nC++ CLI HELP\n";
+    cout << "-----------\n\n";
+    
+    cout << "HOW CODE RUNS:\n";
+    cout << "• Script Mode (default):\n";
+    cout << "  - Immediate execution\n";
+    cout << "  - Output displays ONCE (like Python REPL)\n";
+    cout << "  - Output-producing lines aren't saved\n\n";
+    
+    cout << "• File Mode (type 'file'):\n";
+    cout << "  - Multi-line editing (Ctrl+X to exit and run)\n";
+    cout << "  - Two ways to run:\n";
+    cout << "    1) CONTEXT MODE: Shares variables with Script Mode\n";
+    cout << "    2) TEMPORARY MODE: Runs independently - no variable sharing\n\n";
+    
+    cout << "KEY DIFFERENCES:\n";
+    cout << "┌──────────────┬──────────────────────────┬──────────────────────┐\n";
+    cout << "│              │ Script Mode              │ File Mode            │\n";
+    cout << "├──────────────┼──────────────────────────┼──────────────────────┤\n";
+    cout << "│ Output       │ Shows once               │ Shows every execution│\n";
+    cout << "├──────────────┼──────────────────────────┼──────────────────────┤\n";
+    cout << "│ Persistence  │ Only non-output lines    │ All lines saved      │\n";
+    cout << "├──────────────┼──────────────────────────┼──────────────────────┤\n";
+    cout << "│ Best for     │ Test Syntax, calculations│ Complex code, output │\n";
+    cout << "└──────────────┴──────────────────────────┴──────────────────────┘\n\n";
+    
+    cout << "ESSENTIAL COMMANDS:\n";
+    cout << "• file  -  Enter file mode\n";
+    cout << "• clear  -  Clean terminal\n";
+    cout << "• reset  -  Clear ALL code\n";
+    cout << "• reset script  -  Clear only script\n";
+    cout << "• reset file  -  Clear only file code\n";
+    cout << "• help  -   Show this help\n";
+    cout << "• exit  -   Quit\n\n";
+    
 }
 
 
@@ -93,11 +116,25 @@ int readTabSizeFromEnv(const string& basePath) {
 }
 
 
+bool containsOutput(const string& code) {
+    const vector<string> outputPatterns = {
+        "cout", "printf", "cerr", "puts", "fprintf"
+    };
+
+    for (const string& pattern:outputPatterns) {
+        if (code.find(pattern) == string::npos) continue;
+        return true;
+    }
+
+    return false;
+}
+
+
 int main(int argc, char** argv) {
     string basePath = getExecutablePath();
     ensureFilesExist(basePath);
 
-    string code, line, templateTop, templateBottom;
+    string templateTop, templateBottom;
 
     cout << "C++ CLI (v1.0.0) - Type 'help' for a list of commands.\n";
 
@@ -127,6 +164,9 @@ int main(int argc, char** argv) {
 
     bool contextMode = true;  // Default to Context Mode
     bool fileMode = false;
+    string file = "", script = "", line;
+    int result=1;
+    bool runOnEnter=true; // option
     while (true) {
         char* input = linenoise(">>> ");
         if (!input) exit(0);
@@ -134,13 +174,18 @@ int main(int argc, char** argv) {
         line = string(input);
         free(input);
 
-        if (line.empty()) continue;
+        if (line.empty()) {
+            if (runOnEnter && result==2) {
+                runCode(basePath, false);
+            }
+            continue;
+        }
         linenoiseHistoryAdd(line.c_str());
 
-        string previousCode = code;
+        string previousScript = script;
         if (line == "file") {
             fileMode = true;
-            cout << "\033[F>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")\n";
+            cout << "\033[F>>> file (Ctrl+X to exit and run) (Mode: " << (contextMode ? "Context" : "Temporary") << ")\n";
             linenoiseSetMode(1);
             linenoiseSetMultiLine(0);
 
@@ -153,11 +198,11 @@ int main(int argc, char** argv) {
 
                 if (tempStr.back() == '\x14') { // Ctrl+T
                     contextMode = !contextMode;
-                    int history_len=0, history_file_len=0, history_index=0;
-                    linenoiseGetHistorySizes(&history_len, &history_file_len, &history_index);
+                    int history_file_len=0, history_file_index=0;
+                    linenoiseGetFileHistorySizes(&history_file_len, &history_file_index);
 
-                    cout << "\033[" << history_file_len - history_index << "F\033[K>>> file (Ctrl+X to exit) (Mode: " << (contextMode ? "Context" : "Temporary") << ")";
-                    cout << "\033[" << history_file_len - history_index << "E\033[K" << flush;
+                    cout << "\033[" << history_file_len - history_file_index << "F\033[K>>> file (Ctrl+X to exit and run) (Mode: " << (contextMode ? "Context" : "Temporary") << ")";
+                    cout << "\033[" << history_file_len - history_file_index << "E\033[K" << flush;
                     continue;
                 }
 
@@ -167,32 +212,43 @@ int main(int argc, char** argv) {
 
             }
 
-            int history_len=0, history_file_len=0, history_index=0;
-            linenoiseGetHistorySizes(&history_len, &history_file_len, &history_index);
-            char** historyFile = linenoiseGetHistory();
+            int history_file_len=0, history_file_index=0;
+            linenoiseGetFileHistorySizes(&history_file_len, &history_file_index);
+            char** history_file = linenoiseGetHistoryFile();
 
-            cout << "\033[" << history_index << "E\n";
+            cout << "\033[" << history_file_index << "E\n";
             cout << ">>> End of file\n";
 
-            line = "";
+            file = "\n    ";
             for (int i=history_file_len-1; i>=0; i--) {
-                line += "\n    " + string(historyFile[history_len-1-i]);
+                file += string(history_file[history_file_len-1-i]) + "\n    ";
             }
 
             //cout << "\n|||\n" << line << "\n|||\n";
 
-            if (contextMode) code += "\n    " + line;
-            else code = line;
-            
-            linenoiseResetFileHistory();
             linenoiseSetMode(0);
             linenoiseSetMultiLine(1);
 
         } else if (line == "clear") {
             cout << "\033[2J\033[H" << flush;
             continue;
+        } else if (line == "reset script") {
+            if ((contextMode && !script.empty()) || !fileMode) result = 1;
+            script = "";
+            cout << ">>> Script has been reset!\n";
+            continue;
+        } else if (line == "reset file") {
+            file = "";
+            result = 1;
+            linenoiseResetFileHistory();
+            cout << ">>> File has been reset!\n";
+            continue;
         } else if (line == "reset") {
-            code = "";
+            script = "";
+            file = "";
+            result = 1;
+            linenoiseResetFileHistory();
+            cout << ">>> Script and File has been reset!\n";
             continue;
         } else if (line == "help") {
             showHelp();
@@ -200,7 +256,8 @@ int main(int argc, char** argv) {
         } else if (line == "exit") {
             exit(0);
         } else {
-            code += "\n    " + line;
+            script += "\n    " + line;
+            if (fileMode) fileMode=false;
         }
 
 
@@ -209,18 +266,23 @@ int main(int argc, char** argv) {
             cerr << "Error: Could not open code.cpp\n";
             return 1;
         }
-        codeFileStream << templateTop << code << templateBottom;
+
+        if (contextMode) {
+            codeFileStream << templateTop << file << script << templateBottom;
+        } else if (fileMode)  {
+            codeFileStream << templateTop << file << templateBottom;
+        } else {
+            codeFileStream << templateTop << script << templateBottom;
+        }
+        
         codeFileStream.close();
 
-        int result = runCode(basePath);
-        if (result==1 || (!fileMode && result == 2) || (fileMode && !contextMode)) {
+        result = runCode(basePath); // 0 -> compiled, no output | 1 -> did not compile | 2 -> compiled, output
+        if (result==1 || (!fileMode && containsOutput(line))) {
             // did not compile
             // or in script mode and there is an output
-            // or in file temporary mode
-            code = previousCode;
+            script = previousScript;
         }
-
-        if (fileMode) fileMode=false;
         
     }
 
