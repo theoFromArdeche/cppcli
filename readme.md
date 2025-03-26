@@ -12,7 +12,7 @@ A simple command-line interface (CLI) for writing and executing C++ code interac
   - Immediate line-by-line execution
   - Output displays once (like Python REPL)
   - Non-output lines persist for future execution
-  - Ideal for quick tests and variable setup
+  - Ideal for quick syntax tests or calculations using C++'s power
 
 - **File Mode**
   - Full multi-line editing (enter with `file` command)
