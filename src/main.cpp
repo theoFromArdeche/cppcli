@@ -191,7 +191,10 @@ int main(int argc, char** argv) {
 
             while (true) {
                 char* temp = linenoise("");
-                if (!temp) break;
+                if (!temp) { // Ctrl+C or error
+                    fileMode=false;
+                    break;
+                }
 
                 string tempStr(temp);
                 free(temp);
@@ -228,6 +231,8 @@ int main(int argc, char** argv) {
 
             linenoiseSetMode(0);
             linenoiseSetMultiLine(1);
+
+            if (!fileMode) continue;
 
         } else if (line == "clear") {
             cout << "\033[2J\033[H" << flush;

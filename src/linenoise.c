@@ -159,6 +159,7 @@ enum KEY_ACTION{
 	CTRL_E = 5,         /* Ctrl-e */
 	CTRL_F = 6,         /* Ctrl-f */
     CTRL_G = 7,         /* Ctrl-g */
+    CTRL_H = 8,         /* Ctrl-h */
 	CTRL_I = 9,         /* Ctrl-i */
 	TAB = 9,            /* Tab */
 	CTRL_K = 11,        /* Ctrl+k */
@@ -996,11 +997,45 @@ void linenoiseEditBackspace(struct linenoiseState *l) {
         l->len--;
         l->buf[l->len] = '\0';
         refreshLine(l);
+    } else if (file_mode && *history_index != (*history_len)-1) {
+        int start = (*history_len)-1-(*history_index);
+
+        int prev_size = strlen(history[start-1]);
+        int available_space = LINENOISE_MAX_LINE - prev_size - 1;
+        int copy_size = strlen(l->buf);
+        if (copy_size > available_space) copy_size = available_space;
+
+        strncpy(history[start-1] + prev_size, l->buf, copy_size);
+        history[start-1][prev_size + copy_size] = '\0';
+
+        if (*history_index != 0) {
+            memmove(history+start,history+start+1,sizeof(char*)*(*history_index));
+        }
+
+        history[--(*history_len)]=NULL;
+
+        l->pos=prev_size;
+        l->len=prev_size + copy_size;
+        strncpy(l->buf,history[start-1],l->buflen);
+        l->buf[l->buflen-1] = '\0';
+
+        write(l->ofd, "\033[F", 3);
+        linenoisePrintHistory(start);
+        write(l->ofd, "\033[E\033[K\033[F", 9);
+        
+        if (*history_index != 0) {
+            char temp[LINENOISE_MAX_LINE];
+            sprintf(temp, "\033[%dF", (*history_index));
+            write(l_ofd, temp, strlen(temp));
+        }
+
+        refreshLine(l);
     }
+
     if (file_mode) prevPos=l->pos;
 }
 
-/* Delete the previosu word, maintaining the cursor at the start of the
+/* Delete the previous word, maintaining the cursor at the start of the
  * current word. */
 void linenoiseEditDeletePrevWord(struct linenoiseState *l) {
     size_t old_pos = l->pos;
@@ -1166,10 +1201,12 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
         }
         return strdup(l->buf);
     case CTRL_C:     /* ctrl-c */
+        flag_no_newline=1;
+        linenoiseEditHistoryPopBuffer(l);
         errno = EAGAIN;
         return NULL;
     case BACKSPACE:   /* backspace */
-    case 8:     /* ctrl-h */
+    case CTRL_H:     /* ctrl-h */
         linenoiseEditBackspace(l);
         break;
     case CTRL_D:     /* ctrl-d, remove char at right of cursor, or if the
