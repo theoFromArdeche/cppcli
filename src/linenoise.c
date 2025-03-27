@@ -127,6 +127,7 @@ static char *linenoiseNoTTY(void);
 static void refreshLineWithCompletion(struct linenoiseState *ls, linenoiseCompletions *lc, int flags);
 static void refreshLineWithFlags(struct linenoiseState *l, int flags);
 void linenoisePrintHistory(int startIndex);
+void linenoiseEditHistoryPopBuffer(struct linenoiseState *l);
 
 static struct termios orig_termios; /* In order to restore at exit.*/
 static int maskmode = 0; /* Show "***" instead of input. For passwords. */
@@ -847,7 +848,18 @@ void linenoiseEditMoveLeft(struct linenoiseState *l) {
     if (l->pos > 0) {
         l->pos--;
         refreshLine(l);
+    } else if (file_mode && *history_index != (*history_len)-1) {
+        linenoiseEditHistoryPopBuffer(l);
+        int prev_index=(*history_len) - 2 - (*history_index);
+        strncpy(l->buf,history[prev_index],l->buflen);
+        l->buf[l->buflen-1] = '\0';
+        l->pos=strlen(history[prev_index]);
+        l->len=l->pos;
+        write(l->ofd, "\033[F", 3);
+        refreshLine(l);
+        (*history_index)++;
     }
+
     if (file_mode) prevPos=l->pos;
 }
 
@@ -856,7 +868,18 @@ void linenoiseEditMoveRight(struct linenoiseState *l) {
     if (l->pos != l->len) {
         l->pos++;
         refreshLine(l);
+    } else if (file_mode && *history_index != 0) {
+        linenoiseEditHistoryPopBuffer(l);
+        int prev_index=(*history_len) - (*history_index);
+        strncpy(l->buf,history[prev_index],l->buflen);
+        l->buf[l->buflen-1] = '\0';
+        l->pos=0;
+        l->len=strlen(history[prev_index]);
+        write(l->ofd, "\033[E", 3);
+        refreshLine(l);
+        (*history_index)--;
     }
+
     if (file_mode) prevPos=l->pos;
 }
 
