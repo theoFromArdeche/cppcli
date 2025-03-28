@@ -110,6 +110,8 @@ void linenoiseSetNoNewlineText(const char *text);
 void linenoisePrintKeyCodes(void);
 void linenoiseMaskModeEnable(void);
 void linenoiseMaskModeDisable(void);
+void linenoiseDisableRawMode(void);
+int linenoiseEnableRawMode(void);
 
 #ifdef __cplusplus
 }

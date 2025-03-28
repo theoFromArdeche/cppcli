@@ -215,6 +215,9 @@ int main(int argc, char** argv) {
 
             }
 
+            linenoiseSetMode(0);
+            linenoiseSetMultiLine(1);
+            
             int history_file_len=0, history_file_index=0;
             linenoiseGetFileHistorySizes(&history_file_len, &history_file_index);
             char** history_file = linenoiseGetHistoryFile();
@@ -229,8 +232,7 @@ int main(int argc, char** argv) {
 
             //cout << "\n|||\n" << line << "\n|||\n";
 
-            linenoiseSetMode(0);
-            linenoiseSetMultiLine(1);
+            
 
             if (!fileMode) continue;
 

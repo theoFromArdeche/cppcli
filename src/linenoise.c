@@ -149,6 +149,7 @@ static char **history = NULL;
 static int *history_len = &history_script_len;
 static int *history_index = &history_script_index;
 static int l_ofd = STDOUT_FILENO;
+static int l_ifd = STDIN_FILENO; 
 
 
 enum KEY_ACTION{
@@ -231,6 +232,7 @@ void linenoiseSetTabSize(int tbsize) {
 void linenoiseSetMode(int mode) {
     file_mode = mode;
     if (file_mode) {
+        linenoiseEnableRawMode();
         history = history_file;
         history_index = &history_file_index;
         history_len = &history_file_len;
@@ -246,6 +248,7 @@ void linenoiseSetMode(int mode) {
         write(l_ofd, temp, strlen(temp));
 
     } else {
+        linenoiseDisableRawMode();
         history = history_script;
         history_index = &history_script_index;
         history_len = &history_script_len;
@@ -291,7 +294,7 @@ static int isUnsupportedTerm(void) {
 }
 
 /* Raw mode: 1960 magic shit. */
-static int enableRawMode(int fd) {
+int linenoiseEnableRawMode(void) {
     struct termios raw;
 
     if (!isatty(STDIN_FILENO)) goto fatal;
@@ -307,7 +310,7 @@ static int enableRawMode(int fd) {
         atexit(linenoiseAtExit);
         atexit_registered = 1;
     }
-    if (tcgetattr(fd,&orig_termios) == -1) goto fatal;
+    if (tcgetattr(l_ifd,&orig_termios) == -1) goto fatal;
 
     raw = orig_termios;  /* modify the original mode */
     /* input modes: no break, no CR to NL, no parity check, no strip char,
@@ -325,7 +328,7 @@ static int enableRawMode(int fd) {
     raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0; /* 1 byte, no timer */
 
     /* put terminal in raw mode after flushing */
-    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
+    if (tcsetattr(l_ifd,TCSAFLUSH,&raw) < 0) goto fatal;
     rawmode = 1;
     return 0;
 
@@ -334,9 +337,9 @@ fatal:
     return -1;
 }
 
-static void disableRawMode(int fd) {
+void linenoiseDisableRawMode(void) {
     /* Don't even check the return value as it's too late. */
-    if (rawmode && tcsetattr(fd,TCSAFLUSH,&orig_termios) != -1)
+    if (rawmode && tcsetattr(l_ifd,TCSAFLUSH,&orig_termios) != -1)
         rawmode = 0;
 }
 
@@ -1103,6 +1106,7 @@ int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, ch
      * specific editing functionalities. */
     l->in_completion = 0;
     l->ifd = stdin_fd != -1 ? stdin_fd : STDIN_FILENO;
+    l_ifd = l->ifd;
     l->ofd = stdout_fd != -1 ? stdout_fd : STDOUT_FILENO;
     l_ofd = l->ofd;
     l->buf = buf;
@@ -1113,7 +1117,7 @@ int linenoiseEditStart(struct linenoiseState *l, int stdin_fd, int stdout_fd, ch
     l->len = 0;
 
     /* Enter raw mode. */
-    if (enableRawMode(l->ifd) == -1) return -1;
+    if (!file_mode && linenoiseEnableRawMode() == -1) return -1;
 
 
     if (file_mode && history_file_len != 0) {
@@ -1376,7 +1380,7 @@ char *linenoiseEditFeed(struct linenoiseState *l) {
 void linenoiseEditStop(struct linenoiseState *l) {
     if (!isatty(l->ifd)) return;
     linenoiseNewLine(l);
-    disableRawMode(l->ifd);
+    if (!file_mode) linenoiseDisableRawMode();
 }
 
 /* This just implements a blocking loop for the multiplexed API.
@@ -1397,7 +1401,7 @@ static char *linenoiseBlockingEdit(int stdin_fd, int stdout_fd, char *buf, size_
     char *res;
     while((res = linenoiseEditFeed(&l)) == linenoiseEditMore);
     if ((res == NULL || no_newline_text == NULL || strcmp(res, no_newline_text)) && flag_no_newline==0) linenoiseEditStop(&l);
-    else if (isatty(l.ifd)) disableRawMode(l.ifd);
+    else if (isatty(l.ifd) && !file_mode) linenoiseDisableRawMode();
     if (flag_no_newline) flag_no_newline=0;
     // printf("\n\r|%d|%d|%d|%d|\n", (*history_len), (*history_index), history_file_len, file_mode);
     // for (int i=0; i<history_file_len; i++) {
@@ -1414,7 +1418,7 @@ void linenoisePrintKeyCodes(void) {
 
     printf("Linenoise key codes debugging mode.\n"
             "Press keys to see scan codes. Type 'quit' at any time to exit.\n");
-    if (enableRawMode(STDIN_FILENO) == -1) return;
+    if (!file_mode && linenoiseEnableRawMode() == -1) return;
     memset(quit,' ',4);
     while(1) {
         char c;
@@ -1431,7 +1435,7 @@ void linenoisePrintKeyCodes(void) {
         printf("\r"); /* Go left edge manually, we are in raw mode. */
         fflush(stdout);
     }
-    disableRawMode(STDIN_FILENO);
+    linenoiseDisableRawMode();
 }
 
 /* This function is called when linenoise() is called with the standard
@@ -1527,7 +1531,7 @@ static void freeHistory(void) {
 /* At exit we'll try to fix the terminal to the initial conditions. */
 static void linenoiseAtExit(void) {
     if (atexit_registered) {
-        disableRawMode(STDIN_FILENO);
+        linenoiseDisableRawMode();
         freeHistory();
         atexit_registered=0;
     }
